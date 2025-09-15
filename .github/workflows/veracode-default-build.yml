@@ -33,8 +33,6 @@ on:
 jobs:
   build:
     runs-on: 'windows-latest'
-    container: 
-      image: ${{ inputs.build_packager_image }}
     env:
       VERACODE_API_KEY_ID: '${{ secrets.VERACODE_API_ID }}'
       VERACODE_API_KEY_SECRET: '${{ secrets.VERACODE_API_KEY }}'
