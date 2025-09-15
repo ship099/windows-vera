@@ -33,11 +33,11 @@ on:
 jobs:
   build:
     runs-on: ${{ fromJSON(inputs.build_runs_on) }}
-    container:
-      image: ${{ inputs.build_packager_image }}
+    container: ${{ contains(fromJSON(inputs.build_runs_on), 'windows') && '' || inputs.build_packager_image }}
     env:
       VERACODE_API_KEY_ID: '${{ secrets.VERACODE_API_ID }}'
       VERACODE_API_KEY_SECRET: '${{ secrets.VERACODE_API_KEY }}'
+
     steps:
     - uses: actions/checkout@v4
       with:
@@ -50,12 +50,11 @@ jobs:
         token: ${{ inputs.token }}
         path: 'source-code'
 
-    - name: Package the application
-      id: application_package
+    # ---------------- Linux/Ubuntu packaging ----------------
+    - name: Package the application (Linux)
+      id: application_package_linux
+      if: runner.os == 'Linux'
       shell: bash
-      env:
-        VERACODE_API_KEY_ID: '${{ secrets.VERACODE_API_ID }}'
-        VERACODE_API_KEY_SECRET: '${{ secrets.VERACODE_API_KEY }}'
       run: |
         if [[ ! -z "${{ inputs.build_predependency_command }}" ]]; then
           echo "Executing Pre-Build Dependency.."
@@ -63,13 +62,16 @@ jobs:
         else
           echo "No Pre-Build Dependency provided."
         fi
+
         if [[ "${{ inputs.event_name }}" == *"ruby"* ]]; then
           source /etc/profile.d/rvm.sh
           rvm pkg install openssl
           rvm install ruby-${{ inputs.ruby_version }}
         fi
-        working_path=`pwd`
+
+        working_path=$(pwd)
         echo "working_dir=$working_path" >> "$GITHUB_OUTPUT"
+
         cd veracode-helper/helper/cli
         cliFile=$(ls -1 . | head -n 1)
         cliFileName=$(echo "$cliFile" | cut -c 1-$((${#cliFile}-7)))
@@ -77,6 +79,7 @@ jobs:
         cd $cliFileName
         export PATH="veracode-helper/helper/cli/$cliFileName:$PATH"
         cd $working_path
+
         if [[ "${{ inputs.event_name }}" == *"ruby"* ]]; then
           gem install --install-dir source-code veracode
           cd source-code
@@ -84,15 +87,61 @@ jobs:
           bundle install
           cd ..
         fi
+
         veracode package --source source-code --output veracode-artifacts --trust
 
+    # ---------------- Windows packaging ----------------
+    - name: Package the application (Windows)
+      id: application_package_windows
+      if: runner.os == 'Windows'
+      shell: pwsh
+      run: |
+        Set-ExecutionPolicy AllSigned -Scope Process -Force
+        $ProgressPreference = "silentlyContinue"
+        iex ((New-Object System.Net.WebClient).DownloadString('https://tools.veracode.com/veracode-cli/install.ps1'))
+        $VERACODE_CLI = Get-Command veracode | Select-Object -ExpandProperty Definition
+        Write-Host "Veracode CLI installed at $VERACODE_CLI"
+
+        # Ensure MSBuild is in PATH
+        try {
+          $msbuildAlreadyExists = Get-Command msbuild.exe -ErrorAction SilentlyContinue
+        } catch {
+          $msbuildAlreadyExists = $false
+        }
+        Write-Host "MSBuild install check: $msbuildAlreadyExists"
+
+        if (-not $msbuildAlreadyExists) {
+          $vswherePath = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
+          try {
+            if ([System.IO.File]::Exists($vswherePath)) {
+              $msbuildPath = & $vswherePath -latest -requires Microsoft.Component.MSBuild -find MSBuild\**\Bin\MSBuild.exe
+              if ($msbuildPath) {
+                $msbuildDir = [System.IO.Path]::GetDirectoryName($msbuildPath)
+                if ($msbuildDir -and -not ($env:PATH.Split(";") | Where-Object { $_.TrimEnd('\') -ieq $msbuildDir.TrimEnd('\') })) {
+                  $env:PATH = $msbuildDir + ";" + $env:PATH
+                  Write-Host "msbuild path added: $env:PATH"
+                }
+              }
+            }
+          } catch {
+            Write-Host "vswhere check failed, continuing..."
+          }
+        }
+
+        $working_path = (Get-Location).Path
+        echo "working_dir=$working_path" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+
+        & $VERACODE_CLI package --source "source-code" --output veracode-artifacts --trust
+
+    # ---------------- Error handler ----------------
     - name: Package error
-      if: failure() && steps.application_package.outcome == 'failure'
+      if: failure()
       run: |
         echo "::error::Veracode static scan faced a problem. Please contact your Veracode administrator for more information."
 
+    # ---------------- Upload artifact ----------------
     - uses: actions/upload-artifact@v4
       with:
         name: veracode-artifact
-        path: "${{ steps.application_package.outputs.working_dir }}/veracode-artifacts/*"
+        path: "${{ steps.application_package_linux.outputs.working_dir || steps.application_package_windows.outputs.working_dir }}/veracode-artifacts/*"
         if-no-files-found: error
