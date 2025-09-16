@@ -101,6 +101,12 @@ jobs:
           # Install Veracode CLI
           iex ((New-Object System.Net.WebClient).DownloadString('https://tools.veracode.com/veracode-cli/install.ps1'))
 
+          Get-Command veracode
+          where veracode
+
+          Get-Command veracode.exe
+          where veracode.exe
+
           # Possible install paths
           $possiblePaths = @(
             "$env:USERPROFILE\.veracode\cli\veracode.exe",
