@@ -138,7 +138,7 @@ jobs:
               # Silently ignore errors
             }
           }
-          & $cliPath package --source source-code --output veracode-artifacts --trust
+          & $cliPath package --source source-code --output veracode-artifacts --trust --verbose
           $working_path = (Get-Location).Path
           echo "working_dir=$working_path" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
 
