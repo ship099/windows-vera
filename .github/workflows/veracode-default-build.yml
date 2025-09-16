@@ -98,45 +98,19 @@ jobs:
           Set-ExecutionPolicy Bypass -Scope Process -Force
           $ProgressPreference = "SilentlyContinue"
 
-          # Install Veracode CLI
+          # Install Veracode CLI using their script
           iex ((New-Object System.Net.WebClient).DownloadString('https://tools.veracode.com/veracode-cli/install.ps1'))
 
-          Get-Command veracode
-          where veracode
+          # Path where the CLI actually lands on GitHub Windows runners
+          $cliPath = "$env:APPDATA\veracode\veracode.exe"
 
-          Get-Command veracode.exe
-          where veracode.exe
-
-          # Possible install paths
-          $possiblePaths = @(
-            "$env:USERPROFILE\.veracode\cli\veracode.exe",
-            "$env:LOCALAPPDATA\Programs\veracode\veracode.exe",
-            "$env:APPDATA\veracode\cli\veracode.exe"
-          )
-
-          # Try to find the executable
-          $veracodeExe = $null
-          foreach ($path in $possiblePaths) {
-            if (Test-Path $path) {
-              $veracodeExe = $path
-              break
-            }
-          }
-
-          if (-not $veracodeExe) {
-            Write-Host "Scanning for veracode.exe in runner directories..."
-            Get-ChildItem -Path "$env:USERPROFILE" -Recurse -Filter veracode.exe -ErrorAction SilentlyContinue | ForEach-Object { Write-Host "Found: $_" }
-            Write-Error "Veracode CLI executable not found in expected locations."
+          if (-Not (Test-Path $cliPath)) {
+            Write-Error "Veracode CLI not found at $cliPath"
             exit 1
           }
 
-          Write-Host "Using Veracode CLI at $veracodeExe"
-
-          # Add to PATH
-          $env:PATH = [System.IO.Path]::GetDirectoryName($veracodeExe) + ";" + $env:PATH
-
           # Verify
-          & $veracodeExe --version
+          & $cliPath --version
           
           # Check if MSBuild is already available in PATH
           try {
