@@ -95,11 +95,23 @@ jobs:
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
-          Set-ExecutionPolicy AllSigned -Scope Process -Force
-          $ProgressPreference = "silentlyContinue"
+          Set-ExecutionPolicy Bypass -Scope Process -Force
+          $ProgressPreference = "SilentlyContinue"
+
+          # Install Veracode CLI
           iex ((New-Object System.Net.WebClient).DownloadString('https://tools.veracode.com/veracode-cli/install.ps1'))
-          $VERACODE_CLI = Get-Command veracode | Select-Object -ExpandProperty Definition
-          Write-Host "##vso[task.setvariable variable=VERACODE_CLI]$VERACODE_CLI"
+
+          # Add install location to PATH
+          $veracodeCliDir = "$env:USERPROFILE\.veracode\cli"
+          $env:PATH = "$veracodeCliDir;$env:PATH"
+
+          # Validate install
+          if (-not (Test-Path "$veracodeCliDir\veracode.exe")) {
+            Write-Error "Veracode CLI was not installed at $veracodeCliDir"
+            exit 1
+          }
+          & "$veracodeCliDir\veracode.exe" --version
+          
           # Check if MSBuild is already available in PATH
           try {
             $msbuildAlreadyExists = Get-Command msbuild.exe -ErrorAction SilentlyContinue
