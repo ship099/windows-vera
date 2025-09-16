@@ -101,20 +101,35 @@ jobs:
           # Install Veracode CLI
           iex ((New-Object System.Net.WebClient).DownloadString('https://tools.veracode.com/veracode-cli/install.ps1'))
 
-          # Expected install directory
-          $veracodeCliDir = "$env:LOCALAPPDATA\Programs\veracode"
-          $veracodeExe = Join-Path $veracodeCliDir "veracode.exe"
+          # Possible install paths
+          $possiblePaths = @(
+            "$env:USERPROFILE\.veracode\cli\veracode.exe",
+            "$env:LOCALAPPDATA\Programs\veracode\veracode.exe",
+            "$env:APPDATA\veracode\cli\veracode.exe"
+          )
 
-          if (-not (Test-Path $veracodeExe)) {
-            Write-Error "Veracode CLI not found at $veracodeExe"
-            Get-ChildItem "$env:LOCALAPPDATA\Programs" -Recurse -Filter veracode.exe | ForEach-Object { Write-Host "Found candidate: $_" }
+          # Try to find the executable
+          $veracodeExe = $null
+          foreach ($path in $possiblePaths) {
+            if (Test-Path $path) {
+              $veracodeExe = $path
+              break
+            }
+          }
+
+          if (-not $veracodeExe) {
+            Write-Host "Scanning for veracode.exe in runner directories..."
+            Get-ChildItem -Path "$env:USERPROFILE" -Recurse -Filter veracode.exe -ErrorAction SilentlyContinue | ForEach-Object { Write-Host "Found: $_" }
+            Write-Error "Veracode CLI executable not found in expected locations."
             exit 1
           }
 
-          # Add to PATH
-          $env:PATH = "$veracodeCliDir;$env:PATH"
+          Write-Host "Using Veracode CLI at $veracodeExe"
 
-          # Verify install
+          # Add to PATH
+          $env:PATH = [System.IO.Path]::GetDirectoryName($veracodeExe) + ";" + $env:PATH
+
+          # Verify
           & $veracodeExe --version
           
           # Check if MSBuild is already available in PATH
