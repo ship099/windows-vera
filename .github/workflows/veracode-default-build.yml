@@ -139,8 +139,8 @@ jobs:
             }
           }
           & $cliPath package --source source-code --output veracode-artifacts --trust
-          working_path=$(pwd)
-          echo "working_dir=$working_path" >> "$GITHUB_OUTPUT"
+          $working_path = (Get-Location).Path
+          echo "working_dir=$working_path" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
 
       # ---------------- Error handler ----------------
       - name: Package error
