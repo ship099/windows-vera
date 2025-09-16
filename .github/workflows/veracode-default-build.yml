@@ -139,6 +139,8 @@ jobs:
             }
           }
           & $cliPath package --source source-code --output veracode-artifacts --trust
+          working_path=$(pwd)
+          echo "working_dir=$working_path" >> "$GITHUB_OUTPUT"
 
       # ---------------- Error handler ----------------
       - name: Package error
