@@ -69,6 +69,7 @@ jobs:
           path: ./veracode_artifact_directory
 
       - name: set version
+        shell: bash
         run: |
           echo "VERSION=${{ github.run_id }}-$(date +'%Y%m%d-%H%M%S')" >> $GITHUB_ENV
 
