@@ -54,7 +54,7 @@ on:
 
 jobs:
   policy_scan:
-    runs-on: ubuntu-latest
+    runs-on: windows-latest
     name: policy scan
 
     steps:
