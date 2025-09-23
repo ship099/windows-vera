@@ -26,6 +26,7 @@ on:
         description: 'head_sha of original commit (provided by GitHub app via `github.event.client_payload.sha`)'
         required: true
         type: string
+        default: ''
       github_token: 
         description: 'github_token is a token (provided by GitHub app via `github.event.client_payload.token`)'
         required: true
